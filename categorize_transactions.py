@@ -2,13 +2,17 @@
 
 import argparse
 import csv
+import io
+import prettytable
+import locale
 from collections import defaultdict
+from typing import Mapping
 
 """Calculate totals and sub-totals from transactions provided in a CSV file"""
 
 
 def categorize_transactions(csv_file, category_column, subcategory_column, value_column,
-                            delimiter=","):
+                            delimiter=",") -> Mapping[str, Mapping[str, float]]:
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f, delimiter=delimiter)
 
@@ -27,6 +31,28 @@ def categorize_transactions(csv_file, category_column, subcategory_column, value
     return sums
 
 
+def write_csv(sums: Mapping[str, Mapping[str, float]], f,
+              subcategory_column, delimiter=","):
+    fieldnames = [subcategory_column] + list(sums.keys())
+    writer = csv.DictWriter(f, fieldnames, delimiter=delimiter)
+    writer.writeheader()
+
+    for category, subcategories in sums.items():
+        for subcategory, sum in subcategories.items():
+            if subcategory == "subtotal":
+                continue
+            row = defaultdict(str)
+            row[subcategory_column] = subcategory
+            row[category] = sum
+            writer.writerow(row)
+
+    row = defaultdict(str)
+    row[subcategory_column] = "Subtotal"
+    for category, subcategories in sums.items():
+        row[category] = subcategories["subtotal"]
+    writer.writerow(row)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("csv_file")
@@ -34,22 +60,28 @@ def main():
     parser.add_argument("subcategory_column")
     parser.add_argument("amount_column")
     parser.add_argument("--delimiter", default=",")
+    parser.add_argument("--output-csv-file")
 
     args = parser.parse_args()
-    print(args.csv_file)
     sums = categorize_transactions(args.csv_file, args.category_column,
                                    args.subcategory_column, args.amount_column,
                                    args.delimiter)
 
-    for category, subcategories in sums.items():
-        print(f"{category}:\n")
-        for subcategory, sum in subcategories.items():
-            if subcategory == "subtotal":
-                continue
-            print(f"\t{subcategory}: {sum}")
+    if args.output_csv_file:
+        def open_output():
+            return open(args.output_csv_file, "w+")
+        print_table = False
+    else:
+        def open_output():
+            return io.StringIO()
+        print_table = True
 
-        print("-" * 80)
-        print(f"subtotal: {subcategories['subtotal']}")
+    with open_output() as f:
+        write_csv(sums, f, args.subcategory_column, args.delimiter)
+
+        if print_table:
+            f.seek(0)
+            print(prettytable.from_csv(f, delimiter=args.delimiter))
 
 
 if __name__ == "__main__":

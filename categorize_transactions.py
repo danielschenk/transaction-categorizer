@@ -11,8 +11,9 @@ from typing import Mapping
 """Calculate totals and sub-totals from transactions provided in a CSV file"""
 
 
-def categorize_transactions(csv_file, category_column, subcategory_column, value_column,
-                            delimiter=",") -> Mapping[str, Mapping[str, float]]:
+def categorize_transactions(csv_file, category_column, subcategory_column,
+                            value_column, delimiter=","
+                            ) -> Mapping[str, Mapping[str, float]]:
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f, delimiter=delimiter)
 
@@ -24,7 +25,7 @@ def categorize_transactions(csv_file, category_column, subcategory_column, value
             subcategory = row[subcategory_column]
             if subcategory == "subtotal":
                 raise ValueError("'subtotal' not allowed as subcategory name")
-            value = float(row[value_column].replace(",", "."))
+            value = locale.atof(row[value_column])
             sums[category][subcategory] += value
             sums[category]["subtotal"] += value
 
@@ -43,23 +44,32 @@ def write_csv(sums: Mapping[str, Mapping[str, float]], f,
                 continue
             row = defaultdict(str)
             row[subcategory_column] = subcategory
-            row[category] = sum
+            row[category] = locale.format_string("%.2f", sum)
             writer.writerow(row)
 
     row = defaultdict(str)
     row[subcategory_column] = "Subtotal"
     for category, subcategories in sums.items():
-        row[category] = subcategories["subtotal"]
+        row[category] = locale.format_string("%.2f", subcategories["subtotal"])
     writer.writerow(row)
 
 
 def main():
+    locale.setlocale(locale.LC_ALL, "")
+    if locale.localeconv()["decimal_point"] == ",":
+        # CSV delimiter usually is replaced by ; in this case
+        default_delimiter = ";"
+    else:
+        default_delimiter = ","
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("csv_file")
     parser.add_argument("category_column")
     parser.add_argument("subcategory_column")
     parser.add_argument("amount_column")
-    parser.add_argument("--delimiter", default=",")
+    parser.add_argument("--delimiter",
+                        help="CSV delimiter to use (default: based on locale)",
+                        default=default_delimiter)
     parser.add_argument("--output-csv-file")
 
     args = parser.parse_args()

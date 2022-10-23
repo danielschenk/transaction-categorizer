@@ -63,14 +63,20 @@ def main():
         default_delimiter = ","
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("csv_file")
-    parser.add_argument("category_column")
-    parser.add_argument("subcategory_column")
-    parser.add_argument("amount_column")
+    parser.add_argument("csv_file",
+                        help="path to CSV file with input data")
+    parser.add_argument("category_column",
+                        help="name of the column with transaction categories")
+    parser.add_argument("subcategory_column",
+                        help="name of the column with transaction subcategories")
+    parser.add_argument("amount_column",
+                        help="name of the column with amounts")
     parser.add_argument("--delimiter",
                         help="CSV delimiter to use (default: based on locale)",
                         default=default_delimiter)
-    parser.add_argument("--output-csv-file")
+    parser.add_argument("--output-csv-file",
+                        help="path to CSV file to write results in "
+                        "(when this is omitted, a table will be printed to stdout)")
 
     args = parser.parse_args()
     sums = categorize_transactions(args.csv_file, args.category_column,
